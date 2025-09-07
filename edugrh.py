@@ -1,6 +1,5 @@
 import os
 import json
-import time
 import logging
 from flask import Flask, request, Response, jsonify
 from flask_socketio import SocketIO
@@ -14,19 +13,12 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
 
-# Get production URL from environment
-RENDER_EXTERNAL_HOSTNAME = os.getenv('RENDER_EXTERNAL_HOSTNAME')
-if RENDER_EXTERNAL_HOSTNAME:
-    BASE_URL = f"https://{RENDER_EXTERNAL_HOSTNAME}"
-else:
-    BASE_URL = "http://localhost:5000"
-
-# Get sensitive data from environment variables
-TEACHER_ID = int(os.getenv('TEACHER_ID', '6968612778'))
-BOT_TOKEN = os.getenv('BOT_TOKEN', '8388497886:AAHYfD-OJ6Ka4vh1KF4N0-0T-Aos6Gp2wfQ')
-API_ID = os.getenv('API_ID', '21706160')
-API_HASH = os.getenv('API_HASH', '548b91f0e7cd2e44bbee05190620d9f4')
-GROUP_NAME = "edugrh"
+# Set environment variables directly in the file
+os.environ['TEACHER_ID'] = '6968612778'  # Replace with your Telegram user ID
+os.environ['BOT_TOKEN'] = '8388497886:AAHYfD-OJ6Ka4vh1KF4N0-0T-Aos6Gp2wfQ'  # Replace with your bot token
+os.environ['API_ID'] = '21706160'  # Replace with your Telegram API ID
+os.environ['API_HASH'] = '548b91f0e7cd2e44bbee05190620d9f4'  # Replace with your Telegram API hash
+os.environ['RENDER_EXTERNAL_HOSTNAME'] = 'your-app-name.onrender.com'  # Replace with your Render app URL
 
 # Initialize SocketIO
 socketio = SocketIO(
