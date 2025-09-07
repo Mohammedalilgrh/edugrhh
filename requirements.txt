@@ -1,4 +1,5 @@
-pkg update && pkg upgrade
-pkg install python
-pkg install python-tkinter
-pkg install git
+python-telegram-bot==20.7
+flask==3.0.3
+requests==2.32.3
+python-dotenv==1.0.1
+gunicorn==22.0.0
