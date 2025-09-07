@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: edugrh-classroom
+    runtime: python
+    region: oregon
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn --worker-class eventlet -w 1 edugrh:app"
+    envVars:
+      - key: TEACHER_ID
+        value: 6968612778
+      - key: BOT_TOKEN
+        generateValue: true
+      - key: API_ID
+        value: "21706160"
+      - key: API_HASH
+        generateValue: true
+    plan: free
