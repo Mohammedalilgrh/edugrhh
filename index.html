@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smart Teaching Board</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            touch-action: manipulation;
+        }
+
+        :root {
+            --bg-dark: #121212;
+            --bg-darker: #0a0a0a;
+            --card-bg: #1e1e1e;
+            --primary: #6c63ff;
+            --primary-light: #8a85ff;
+            --secondary: #4cc9f0;
+            --text: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --border: #333333;
+            --success: #06d6a0;
+            --warning: #ffd166;
+            --danger: #ef476f;
+            --toolbar-height: 60px;
+            --topbar-height: 56px;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Top Navigation Bar */
+        .top-bar {
+            height: var(--topbar-height);
+            background: var(--bg-darker);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            z-index: 100;
+        }
+
+        .top-bar-content {
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+
+        .course-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .course-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .course-subtitle {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(108, 99, 255, 0.15);
+            color: var(--primary);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--primary);
+        }
+
+        /* Main Content Area */
+        .main-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Drawing Canvas Area */
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            background: var(--bg-darker);
+            overflow: hidden;
+        }
+
+        #teaching-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        .canvas-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(10, 10, 10, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 5;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .canvas-overlay.active {
+            opacity: 1;
+        }
+
+        .overlay-content {
+            text-align: center;
+            padding: 20px;
+            max-width: 80%;
+        }
+
+        .overlay-icon {
+            font-size: 3rem;
+            color: var(--primary);
+            margin-bottom: 15px;
+        }
+
+        .overlay-title {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            color: var(--text);
+        }
+
+        .overlay-text {
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* Toolbar */
+        .toolbar {
+            height: var(--toolbar-height);
+            background: var(--bg-darker);
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            gap: 15px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .tool-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-right: 1px solid var(--border);
+            padding-right: 12px;
+            height: 100%;
+            align-items: center;
+        }
+
+        .tool-group:last-child {
+            border-right: none;
+            padding-right: 0;
+        }
+
+        .tool-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: var(--card-bg);
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .tool-btn:hover, .tool-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .tool-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: var(--primary-light);
+        }
+
+        .tool-btn i {
+            font-size: 1.2rem;
+        }
+
+        .color-picker {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            border: 2px solid var(--border);
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .color-picker.active {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px var(--primary);
+        }
+
+        .line-width-selector {
+            display: flex;
+            gap: 6px;
+            padding: 4px;
+            background: var(--card-bg);
+            border-radius: 8px;
+        }
+
+        .line-width {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            background: var(--bg-darker);
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+        }
+
+        .line-width.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .tool-separator {
+            width: 1px;
+            height: 30px;
+            background: var(--border);
+            flex-shrink: 0;
+        }
+
+        /* Student Controls */
+        .student-controls {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: rgba(30, 30, 30, 0.85);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 10;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            max-width: 280px;
+            width: 100%;
+        }
+
+        .student-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .student-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text);
+        }
+
+        .student-count {
+            background: rgba(108, 99, 255, 0.15);
+            color: var(--primary);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+
+        .student-list {
+            max-height: 200px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .student-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 0;
+        }
+
+        .student-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
+
+        .student-name {
+            font-size: 0.85rem;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .student-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            flex-shrink: 0;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 480px) {
+            .tool-group {
+                gap: 4px;
+                padding-right: 8px;
+            }
+            
+            .tool-btn {
+                width: 36px;
+                height: 36px;
+            }
+            
+            .student-controls {
+                max-width: 240px;
+                right: 8px;
+            }
+        }
+
+        /* Animation classes */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-in {
+            animation: fadeIn 0.3s ease forwards;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-darker);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Top Navigation Bar -->
+    <div class="top-bar">
+        <div class="top-bar-content">
+            <div class="course-info">
+                <div class="course-title">Advanced Web Development Course</div>
+                <div class="course-subtitle">Lesson 4: Building Responsive UIs</div>
+            </div>
+            <div class="status-indicator">
+                <span class="status-dot"></span>
+                Live Session
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="main-content">
+        <!-- Canvas Container -->
+        <div class="canvas-container">
+            <canvas id="teaching-canvas"></canvas>
+            
+            <!-- Canvas Overlay -->
+            <div class="canvas-overlay" id="canvas-overlay">
+                <div class="overlay-content animate-in">
+                    <div class="overlay-icon">
+                        <i class="fas fa-chalkboard-teacher"></i>
+                    </div>
+                    <h2 class="overlay-title">Smart Teaching Board</h2>
+                    <p class="overlay-text">Draw, annotate, and explain concepts with precision. Use the toolbar below to access all teaching tools.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Student Controls -->
+        <div class="student-controls">
+            <div class="student-header">
+                <div class="student-title">Connected Students</div>
+                <div class="student-count">8 Online</div>
+            </div>
+            <div class="student-list" id="student-list">
+                <div class="student-item">
+                    <div class="student-avatar" style="background: #6c63ff;">A</div>
+                    <div class="student-name">Alex Morgan</div>
+                    <div class="student-status"></div>
+                </div>
+                <div class="student-item">
+                    <div class="student-avatar" style="background: #4cc9f0;">J</div>
+                    <div class="student-name">Jamie Chen</div>
+                    <div class="student-status"></div>
+                </div>
+                <div class="student-item">
+                    <div class="student-avatar" style="background: #ff6b6b;">S</div>
+                    <div class="student-name">Samira Patel</div>
+                    <div class="student-status"></div>
+                </div>
+                <div class="student-item">
+                    <div class="student-avatar" style="background: #ffd166;">T</div>
+                    <div class="student-name">Taylor Kim</div>
+                    <div class="student-status"></div>
+                </div>
+                <div class="student-item">
+                    <div class="student-avatar" style="background: #06d6a0;">M</div>
+                    <div class="student-name">Morgan Lee</div>
+                    <div class="student-status"></div>
+                </div>
+                <div class="student-item">
+                    <div class="student-avatar" style="background: #118ab2;">R</div>
+                    <div class="student-name">Riley Smith</div>
+                    <div class="student-status"></div>
+                </div>
+                <div class="student-item">
+                    <div class="student-avatar" style="background: #ef476f;">D</div>
+                    <div class="student-name">Dakota Jones</div>
+                    <div class="student-status"></div>
+                </div>
+                <div class="student-item">
+                    <div class="student-avatar" style="background: #073b4c;">K</div>
+                    <div class="student-name">Kai Williams</div>
+                    <div class="student-status"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <div class="tool-group">
+            <button class="tool-btn active" id="pen-tool" title="Pen Tool">
+                <i class="fas fa-pen"></i>
+            </button>
+            <button class="tool-btn" id="highlighter-tool" title="Highlighter">
+                <i class="fas fa-highlighter"></i>
+            </button>
+            <button class="tool-btn" id="eraser-tool" title="Eraser">
+                <i class="fas fa-eraser"></i>
+            </button>
+        </div>
+        
+        <div class="tool-group">
+            <div class="color-picker active" style="background: #ffffff;" data-color="#ffffff" title="White"></div>
+            <div class="color-picker" style="background: #6c63ff;" data-color="#6c63ff" title="Purple"></div>
+            <div class="color-picker" style="background: #4cc9f0;" data-color="#4cc9f0" title="Blue"></div>
+            <div class="color-picker" style="background: #ffd166;" data-color="#ffd166" title="Yellow"></div>
+            <div class="color-picker" style="background: #06d6a0;" data-color="#06d6a0" title="Green"></div>
+            <div class="color-picker" style="background: #ef476f;" data-color="#ef476f" title="Red"></div>
+        </div>
+        
+        <div class="tool-group">
+            <div class="line-width-selector">
+                <div class="line-width active" data-width="3">3</div>
+                <div class="line-width" data-width="5">5</div>
+                <div class="line-width" data-width="8">8</div>
+                <div class="line-width" data-width="12">12</div>
+            </div>
+        </div>
+        
+        <div class="tool-group">
+            <button class="tool-btn" id="undo-btn" title="Undo">
+                <i class="fas fa-undo"></i>
+            </button>
+            <button class="tool-btn" id="redo-btn" title="Redo">
+                <i class="fas fa-redo"></i>
+            </button>
+            <button class="tool-btn" id="clear-btn" title="Clear Board">
+                <i class="fas fa-trash-alt"></i>
+            </button>
+        </div>
+        
+        <div class="tool-group">
+            <button class="tool-btn" id="text-tool" title="Add Text">
+                <i class="fas fa-font"></i>
+            </button>
+            <button class="tool-btn" id="shape-tool" title="Shapes">
+                <i class="fas fa-shapes"></i>
+            </button>
+            <button class="tool-btn" id="image-tool" title="Insert Image">
+                <i class="fas fa-image"></i>
+            </button>
+        </div>
+        
+        <div class="tool-group">
+            <button class="tool-btn" id="save-btn" title="Save Board">
+                <i class="fas fa-save"></i>
+            </button>
+            <button class="tool-btn" id="share-btn" title="Share Board">
+                <i class="fas fa-share-alt"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Telegram WebApp
+        document.addEventListener('DOMContentLoaded', function() {
+            // Expand the app to full screen
+            if (window.Telegram && Telegram.WebApp) {
+                Telegram.WebApp.expand();
+                Telegram.WebApp.ready();
+                Telegram.WebApp.setHeaderColor('#0a0a0a');
+                Telegram.WebApp.setBackgroundColor('#121212');
+                
+                // Setup Main Button for saving
+                Telegram.WebApp.MainButton.setText("Save Board");
+                Telegram.WebApp.MainButton.show();
+                Telegram.WebApp.MainButton.onClick(saveBoard);
+            }
+            
+            // Initialize the teaching board
+            initTeachingBoard();
+        });
+
+        // Teaching Board Initialization
+        function initTeachingBoard() {
+            const canvas = document.getElementById('teaching-canvas');
+            const ctx = canvas.getContext('2d');
+            const overlay = document.getElementById('canvas-overlay');
+            
+            // Set canvas size to container
+            function resizeCanvas() {
+                const container = canvas.parentElement;
+                canvas.width = container.clientWidth;
+                canvas.height = container.clientHeight;
+                
+                // Redraw if needed
+                if (canvas.width > 0 && canvas.height > 0) {
+                    drawInitialBoard();
+                }
+            }
+            
+            // Initial board setup
+            function drawInitialBoard() {
+                ctx.fillStyle = '#0a0a0a';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw grid
+                ctx.strokeStyle = 'rgba(80, 80, 80, 0.15)';
+                ctx.lineWidth = 1;
+                
+                // Vertical lines
+                for (let x = 50; x < canvas.width; x += 50) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, canvas.height);
+                    ctx.stroke();
+                }
+                
+                // Horizontal lines
+                for (let y = 50; y < canvas.height; y += 50) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                    ctx.stroke();
+                }
+            }
+            
+            // Tool states
+            let currentTool = 'pen';
+            let currentColor = '#ffffff';
+            let currentLineWidth = 3;
+            let isDrawing = false;
+            let lastX = 0;
+            let lastY = 0;
+            let history = [];
+            let historyStep = -1;
+            
+            // Initialize canvas
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+            
+            // Show overlay initially
+            setTimeout(() => {
+                overlay.classList.add('active');
+            }, 500);
+            
+            // Hide overlay when drawing starts
+            canvas.addEventListener('mousedown', () => {
+                overlay.classList.remove('active');
+            });
+            
+            canvas.addEventListener('touchstart', () => {
+                overlay.classList.remove('active');
+            });
+            
+            // Drawing functions
+            function startDrawing(e) {
+                isDrawing = true;
+                [lastX, lastY] = getMousePosition(e);
+                saveState();
+            }
+            
+            function draw(e) {
+                if (!isDrawing) return;
+                
+                e.preventDefault();
+                const [x, y] = getMousePosition(e);
+                
+                ctx.lineJoin = 'round';
+                ctx.lineCap = 'round';
+                ctx.lineWidth = currentLineWidth;
+                ctx.strokeStyle = currentColor;
+                
+                if (currentTool === 'eraser') {
+                    ctx.strokeStyle = '#0a0a0a'; // Erase to background color
+                    ctx.globalCompositeOperation = 'destination-out';
+                    ctx.lineWidth = 20;
+                } else {
+                    ctx.globalCompositeOperation = 'source-over';
+                }
+                
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(x, y);
+                ctx.stroke();
+                
+                [lastX, lastY] = [x, y];
+            }
+            
+            function stopDrawing() {
+                if (isDrawing) {
+                    isDrawing = false;
+                }
+            }
+            
+            function getMousePosition(e) {
+                const rect = canvas.getBoundingClientRect();
+                let clientX, clientY;
+                
+                if (e.type.includes('touch')) {
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                } else {
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                }
+                
+                return [
+                    clientX - rect.left,
+                    clientY - rect.top
+                ];
+            }
+            
+            function saveState() {
+                // Limit history to 20 steps
+                if (historyStep < history.length - 1) {
+                    history = history.slice(0, historyStep + 1);
+                }
+                
+                if (history.length > 20) {
+                    history.shift();
+                }
+                
+                history.push(canvas.toDataURL());
+                historyStep = history.length - 1;
+            }
+            
+            function undo() {
+                if (historyStep > 0) {
+                    historyStep--;
+                    restoreState();
+                }
+            }
+            
+            function redo() {
+                if (historyStep < history.length - 1) {
+                    historyStep++;
+                    restoreState();
+                }
+            }
+            
+            function restoreState() {
+                const img = new Image();
+                img.src = history[historyStep];
+                img.onload = function() {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0);
+                };
+            }
+            
+            function clearBoard() {
+                saveState();
+                drawInitialBoard();
+            }
+            
+            function saveBoard() {
+                // In a real implementation, this would save to Telegram
+                const dataURL = canvas.toDataURL('image/png');
+                
+                if (window.Telegram && Telegram.WebApp) {
+                    // Show success message
+                    Telegram.WebApp.showAlert("Board saved successfully! The image has been sent to your chat.");
+                    
+                    // In a real app, you would send this to your backend
+                    console.log("Saving board data:", dataURL.substring(0, 50) + "...");
+                } else {
+                    alert("Board saved! In a real Telegram Mini App, this would be sent to your chat.");
+                }
+            }
+            
+            // Event listeners
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+            
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                startDrawing(e);
+            });
+            canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                draw(e);
+            });
+            canvas.addEventListener('touchend', stopDrawing);
+            
+            // Tool selection
+            document.getElementById('pen-tool').addEventListener('click', () => {
+                setTool('pen');
+            });
+            
+            document.getElementById('highlighter-tool').addEventListener('click', () => {
+                setTool('highlighter');
+            });
+            
+            document.getElementById('eraser-tool').addEventListener('click', () => {
+                setTool('eraser');
+            });
+            
+            // Color selection
+            document.querySelectorAll('.color-picker').forEach(picker => {
+                picker.addEventListener('click', () => {
+                    document.querySelectorAll('.color-picker').forEach(p => p.classList.remove('active'));
+                    picker.classList.add('active');
+                    currentColor = picker.getAttribute('data-color');
+                });
+            });
+            
+            // Line width selection
+            document.querySelectorAll('.line-width').forEach(width => {
+                width.addEventListener('click', () => {
+                    document.querySelectorAll('.line-width').forEach(w => w.classList.remove('active'));
+                    width.classList.add('active');
+                    currentLineWidth = parseInt(width.getAttribute('data-width'));
+                });
+            });
+            
+            // Undo/Redo/Clear
+            document.getElementById('undo-btn').addEventListener('click', undo);
+            document.getElementById('redo-btn').addEventListener('click', redo);
+            document.getElementById('clear-btn').addEventListener('click', clearBoard);
+            
+            // Other tools (placeholders for demonstration)
+            document.getElementById('text-tool').addEventListener('click', () => {
+                showFeatureNotification('Text Tool', 'Click on the board to add text annotations');
+            });
+            
+            document.getElementById('shape-tool').addEventListener('click', () => {
+                showFeatureNotification('Shapes', 'Draw rectangles, circles, and arrows');
+            });
+            
+            document.getElementById('image-tool').addEventListener('click', () => {
+                showFeatureNotification('Image Insert', 'Upload images to annotate');
+            });
+            
+            document.getElementById('share-btn').addEventListener('click', () => {
+                if (window.Telegram && Telegram.WebApp) {
+                    Telegram.WebApp.showAlert("Board shared with students! They can view the current state in real-time.");
+                } else {
+                    alert("Board shared! In a real Telegram Mini App, students would see the update immediately.");
+                }
+            });
+            
+            // Helper function to set tool
+            function setTool(tool) {
+                currentTool = tool;
+                document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+                
+                if (tool === 'pen') {
+                    document.getElementById('pen-tool').classList.add('active');
+                } else if (tool === 'highlighter') {
+                    document.getElementById('highlighter-tool').classList.add('active');
+                } else if (tool === 'eraser') {
+                    document.getElementById('eraser-tool').classList.add('active');
+                }
+            }
+            
+            // Helper function to show feature notifications
+            function showFeatureNotification(title, message) {
+                if (window.Telegram && Telegram.WebApp) {
+                    Telegram.WebApp.showAlert(`${title}\n\n${message}`);
+                } else {
+                    alert(`${title}: ${message}`);
+                }
+            }
+            
+            // Initialize history with blank state
+            saveState();
+            
+            // Simulate student activity
+            simulateStudentActivity();
+        }
+        
+        // Simulate student activity for demo purposes
+        function simulateStudentActivity() {
+            const studentList = document.getElementById('student-list');
+            const statuses = studentList.querySelectorAll('.student-status');
+            
+            // Randomly update student status
+            setInterval(() => {
+                const randomIndex = Math.floor(Math.random() * statuses.length);
+                const status = statuses[randomIndex];
+                
+                // Toggle status
+                if (status.style.background === 'var(--success)' || !status.style.background) {
+                    status.style.background = 'var(--warning)';
+                } else {
+                    status.style.background = 'var(--success)';
+                }
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
