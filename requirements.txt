@@ -1,5 +1,4 @@
-Flask==2.3.2
-Flask-SocketIO==5.3.6
-requests==2.31.0
-python-dotenv==1.0.0
-eventlet==0.33.3
+pkg update && pkg upgrade
+pkg install python
+pkg install python-tkinter
+pkg install git
